@@ -1,0 +1,76 @@
+------------------------------------
+Path: src >> route >> Index.js
+------------------------------------
+
+const express = require('express');
+const router = express.Router();
+
+// In-memory collection (pre-populated to match screenshots)
+let cards = [
+  { id: 1, suit: "Hearts", value: "Ace" },
+  { id: 2, suit: "Spades", value: "King" },
+  { id: 3, suit: "Diamonds", value: "Queen" }
+];
+
+// GET /cards -> list all cards
+router.get('/cards', (req, res) => {
+  res.json(cards);
+});
+
+// GET /cards/:id -> single card
+router.get('/cards/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const card = cards.find(c => c.id === id);
+  if (!card) return res.status(404).json({ message: 'Card not found' });
+  res.json(card);
+});
+
+// POST /cards -> add a card (expects { suit, value } in JSON body)
+router.post('/cards', (req, res) => {
+  const { suit, value } = req.body;
+  if (!suit || !value) {
+    return res.status(400).json({ message: 'Suit and value are required' });
+  }
+
+  const newId = cards.length ? (cards[cards.length - 1].id + 1) : 1;
+  const newCard = { id: newId, suit, value };
+  cards.push(newCard);
+  res.status(201).json(newCard);
+});
+
+// DELETE /cards/:id -> remove a card
+router.delete('/cards/:id', (req, res) => {
+  const id = Number(req.params.id);
+  const idx = cards.findIndex(c => c.id === id);
+  if (idx === -1) return res.status(404).json({ message: 'Card not found' });
+
+  const removed = cards.splice(idx, 1)[0];
+  res.json({ message: `Card with ID ${id} removed`, card: removed });
+});
+
+module.exports = router;
+
+------------------------------
+App.js
+------------------------------
+const express = require('express');
+const path = require('path');
+
+const app = express();          // <-- create app BEFORE using it
+app.use(express.json());       // parse JSON bodies
+
+// Serve a static index.html if you want (optional)
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Import routes and mount them
+const routes = require('./routes'); // requires src/routes/index.js
+app.use('/', routes);               // use '/' to match the course screenshots
+// If you prefer /api prefix: app.use('/api', routes);
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
+

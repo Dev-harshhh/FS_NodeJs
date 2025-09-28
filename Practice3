@@ -1,0 +1,98 @@
+App.js
+-----------------
+
+const express = require("express");
+const routes = require("./routes");
+
+const app = express();
+app.use(express.json());
+
+app.use("/", routes);
+
+const port = 3000;
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
+
+-------------------
+index.js
+-------------------
+
+const express = require("express");
+const router = express.Router();
+
+// Seats in-memory (5 seats for demo)
+let seats = {
+  1: { status: "available" },
+  2: { status: "available" },
+  3: { status: "available" },
+  4: { status: "available" },
+  5: { status: "available" }
+};
+
+// Store lock timers
+let lockTimers = {};
+
+// GET all seats
+router.get("/seats", (req, res) => {
+  res.json(seats);
+});
+
+// POST /lock/:id -> lock a seat for 1 min
+router.post("/lock/:id", (req, res) => {
+  const seatId = req.params.id;
+
+  if (!seats[seatId]) {
+    return res.status(404).json({ message: "Seat not found" });
+  }
+
+  if (seats[seatId].status === "booked") {
+    return res.status(400).json({ message: "Seat already booked" });
+  }
+
+  if (seats[seatId].status === "locked") {
+    return res.status(400).json({ message: "Seat already locked" });
+  }
+
+  // Lock the seat
+  seats[seatId].status = "locked";
+
+  // Clear old timer if exists
+  if (lockTimers[seatId]) clearTimeout(lockTimers[seatId]);
+
+  // Auto-unlock after 1 minute if not confirmed
+  lockTimers[seatId] = setTimeout(() => {
+    if (seats[seatId].status === "locked") {
+      seats[seatId].status = "available";
+      delete lockTimers[seatId];
+    }
+  }, 60 * 1000);
+
+  res.json({ message: `Seat ${seatId} locked successfully. Confirm within 1 minute.` });
+});
+
+// POST /confirm/:id -> confirm a seat
+router.post("/confirm/:id", (req, res) => {
+  const seatId = req.params.id;
+
+  if (!seats[seatId]) {
+    return res.status(404).json({ message: "Seat not found" });
+  }
+
+  if (seats[seatId].status === "available") {
+    return res.status(400).json({ message: "Seat is not locked yet" });
+  }
+
+  if (seats[seatId].status === "booked") {
+    return res.status(400).json({ message: "Seat already booked" });
+  }
+
+  // Confirm booking
+  seats[seatId].status = "booked";
+  clearTimeout(lockTimers[seatId]);
+  delete lockTimers[seatId];
+
+  res.json({ message: `Seat ${seatId} confirmed successfully.` });
+});
+
+module.exports = router;
